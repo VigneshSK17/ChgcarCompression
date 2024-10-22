@@ -8,7 +8,7 @@ from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.outputs import Chgcar
 from pyrho.charge_density import ChargeDensity, PGrid
 
-from utils import io
+from utils import chgcar, io
 
 """
 sys.argv[1] = chgcar_folder
@@ -96,6 +96,10 @@ def compress_dir(files: list[str]):
     with ThreadPoolExecutor() as executor:
         for file in files:
             file_name = file.split(".")[0]
+            extension = file.split(".")[1]
+
+            if file_name in orig_values or extension != "vasp":
+                continue
 
             future_parser = executor.submit(parse_chgcar, file)
             structure, charge, mag, data_aug, dims = future_parser.result()
@@ -157,8 +161,8 @@ def main():
     files = io.get_files_in_dir(folder)
 
     if method == "compress":
-        compressed_values = compress_dir(files)
-        for file_name, (charge, mag) in compressed_values.items():
+        orig_values = compress_dir(files)
+        for file_name, (charge, mag) in orig_values.items():
             print(file_name, charge.grid_shape, mag.grid_shape)
 
     if method == "decompress":
@@ -166,9 +170,15 @@ def main():
         for file_name, (charge, mag) in decompressed_values.items():
             print(file_name, charge.grid_shape, mag.grid_shape)
 
+    # Compresses and then decompresses CHGCAR's, provides MAE
     if method == "remake":
-        # TODO: Compress and decompress and then compare MAE
-        pass
+        orig_values = compress_dir(files)
+        decompressed_values = decompress_and_remake_dir(files)
+        for file_name in orig_values.keys():
+            orig = orig_values[file_name]
+            decompressed = decompressed_values[file_name]
+            print(file_name, "Charge Density MAE: ", chgcar.mae(orig[0].grid_data, decompressed[0].grid_data))
+            print(file_name, "Mag Density MAE: ", chgcar.mae(orig[1].grid_data, decompressed[1].grid_data))
 
 
 if __name__ == "__main__":
