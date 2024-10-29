@@ -11,9 +11,10 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "test/pyrho_decompress",
-                "decompress",
-                "2"
+                "test/pyrho_1079437",
+                "remake",
+                "3",
+                "0.01"
             ]
         }
     ]

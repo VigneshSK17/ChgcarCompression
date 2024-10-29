@@ -45,8 +45,8 @@ def compress_func(charge: PGrid, mag: PGrid, dims: list[int]):
     return charge_compressed, mag_compressed, time_end - time_start
 
 
-def store_compressed(chgcar_fn: str, charge, mag, structure, data_aug):
-    np.savez_compressed(f"{chgcar_fn}_compressed.npz", charge=charge, mag=mag)
+def store_compressed(chgcar_fn: str, charge, mag, structure, data_aug, dims):
+    np.savez_compressed(f"{chgcar_fn}_compressed.npz", charge=charge, mag=mag, dims=dims)
 
     with open(f"{chgcar_fn}_structure.cif", "w") as f:
         f.write(structure.to(fmt="cif"))
@@ -57,13 +57,14 @@ def retrieve_compressed(chgcar_fn: str):
     data = np.load(f"{chgcar_fn}_compressed.npz")
     charge_compressed = data["charge"]
     mag_compressed = data["mag"]
+    dims = data["dims"]
 
     parser = CifParser(f"{chgcar_fn}_structure.cif")
     structure = parser.parse_structures()[0]
     lattice = structure.lattice.matrix
     data_aug = json.loads(open(f"{chgcar_fn}_data_aug.txt").read())
 
-    return charge_compressed, mag_compressed, structure, lattice, data_aug
+    return charge_compressed, mag_compressed, dims, structure, lattice, data_aug
 
 
 def decompress_func(data: np.ndarray, lattice: np.ndarray, dims: list[int]):
@@ -110,7 +111,7 @@ def compress_dir(files: list[str]):
 
             charge_compressed, mag_compressed, compress_duration = future_compressed.result()
 
-            future_store_compressed = executor.submit(store_compressed, file_name, charge_compressed, mag_compressed, structure, data_aug)
+            future_store_compressed = executor.submit(store_compressed, file_name, charge_compressed, mag_compressed, structure, data_aug, dims)
 
             print(f"{file_name} - Compression Duration: {compress_duration} s")
 
@@ -128,12 +129,15 @@ def decompress_and_remake_dir(files: list[str]):
                 continue
 
             future_decompress = executor.submit(retrieve_compressed, file_name)
-            charge_compressed, mag_compressed, structure, lattice, data_aug = future_decompress.result()
+            charge_compressed, mag_compressed, dims, structure, lattice, data_aug = future_decompress.result()
 
-            shape = [dim * int(sys.argv[3]) for dim in charge_compressed.shape]
+            # shape = [dim * int(sys.argv[3]) for dim in charge_compressed.shape]
 
-            future_decompress_charge = executor.submit(decompress_func, charge_compressed, lattice, shape)
-            future_decompress_mag = executor.submit(decompress_func, mag_compressed, lattice, shape)
+            # future_decompress_charge = executor.submit(decompress_func, charge_compressed, lattice, shape)
+            # future_decompress_mag = executor.submit(decompress_func, mag_compressed, lattice, shape)
+            future_decompress_charge = executor.submit(decompress_func, charge_compressed, lattice, dims)
+            future_decompress_mag = executor.submit(decompress_func, mag_compressed, lattice, dims)
+
 
             decompress_charge, decompress_charge_duration = future_decompress_charge.result()
             decompress_mag, decompress_mag_duration = future_decompress_mag.result()
@@ -174,11 +178,14 @@ def main():
     if method == "remake":
         orig_values = compress_dir(files)
         decompressed_values = decompress_and_remake_dir(files)
+
         for file_name in orig_values.keys():
             orig = orig_values[file_name]
             decompressed = decompressed_values[file_name]
             print(file_name, "Charge Density MAE: ", chgcar.mae(orig[0].grid_data, decompressed[0].grid_data))
             print(file_name, "Mag Density MAE: ", chgcar.mae(orig[1].grid_data, decompressed[1].grid_data))
+            print(file_name, "Charge Density Avg Percentage Difference: ", chgcar.mean_percentage_diff(orig[0].grid_data, decompressed[0].grid_data))
+            print(file_name, "Mag Density Avg Percentage Difference: ", chgcar.mean_percentage_diff(orig[1].grid_data, decompressed[1].grid_data))
 
 
 if __name__ == "__main__":

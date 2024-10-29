@@ -144,3 +144,7 @@ def raw_to_data(raw_file: str):
 # Math
 def mae(actual: np.ndarray, predicted: np.ndarray):
     return np.average(np.absolute((actual.astype("float") - predicted.astype("float"))))
+
+def mean_percentage_diff(actual: np.ndarray, predicted: np.ndarray):
+    actual, predicted = actual.astype("float"), predicted.astype("float")
+    return (abs((np.abs(actual - predicted) / ((actual + predicted) / 2)) * 100)).mean()
