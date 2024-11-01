@@ -1,4 +1,5 @@
-from concurrent.futures import ThreadPoolExecutor, wait
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import gzip
 import json
 import sys
@@ -104,31 +105,36 @@ def remake_chgcar(chgcar_fn: str, charge_pgrid: PGrid, mag_pgrid: PGrid, structu
     chgcar.data_aug = data_aug
     chgcar.write_file(f"{chgcar_fn}_pyrho.vasp")
 
+def compress_file_helper(file: str, file_no_ext: str):
+    structure, charge, mag, data_aug, dims = parse_chgcar(file)
+    charge_compressed, mag_compressed, compress_duration = compress_func(charge, mag, dims)
+    store_compressed(file_no_ext, charge_compressed, mag_compressed, structure, data_aug, dims)
+
+    return file_no_ext, charge, mag, compress_duration
 
 def compress_dir(files: list[str]):
     orig_values = {}
+    metrics = defaultdict(dict)
+
     with ThreadPoolExecutor() as executor:
+        compress_file_futures = []
         for file in files:
-            file_name = file.split(".")[0]
+            file_no_ext = file.split(".")[0]
             extension = file.split(".")[1]
 
-            if file_name in orig_values or extension != "vasp":
+            if file_no_ext in orig_values or extension != "vasp":
                 continue
 
-            future_parser = executor.submit(parse_chgcar, file)
-            structure, charge, mag, data_aug, dims = future_parser.result()
+            future_compress_file = executor.submit(compress_file_helper, file, file_no_ext)
+            compress_file_futures.append(future_compress_file)
 
-            orig_values[file_name] = [charge, mag]
+        for future in as_completed(compress_file_futures):
+            file_no_ext, charge, mag, compress_duration = future.result()
+            orig_values[file_no_ext] = [charge, mag]
+            metrics[file_no_ext]["compress_duration"] = compress_duration
+            # TODO: Add file size metrics
 
-            future_compressed = executor.submit(compress_func, charge, mag, dims)
-
-            charge_compressed, mag_compressed, compress_duration = future_compressed.result()
-
-            future_store_compressed = executor.submit(store_compressed, file_name, charge_compressed, mag_compressed, structure, data_aug, dims)
-
-            print(f"{file_name} - Compression Duration: {compress_duration} s")
-
-    return orig_values
+    return orig_values, metrics
 
 def decompress_and_remake_dir(files: list[str]):
     decompressed_values = {}
@@ -178,9 +184,9 @@ def main():
     files = io.get_files_in_dir(folder)
 
     if method == "compress":
-        orig_values = compress_dir(files)
-        for file_name, (charge, mag) in orig_values.items():
-            print(file_name, charge.grid_shape, mag.grid_shape)
+        orig_values, all_metrics = compress_dir(files)
+        for file_no_ext, file_metrics in all_metrics.items():
+            print(file_no_ext, "Compression Duration: ", file_metrics["compress_duration"])
 
     if method == "decompress":
         decompressed_values = decompress_and_remake_dir(files)
@@ -188,6 +194,7 @@ def main():
             print(file_name, charge.grid_shape, mag.grid_shape)
 
     # Compresses and then decompresses CHGCAR's, provides MAE
+    # TODO: Rework for the changed compress_dir and decompress_dir
     if method == "remake":
         orig_values = compress_dir(files)
         decompressed_values = decompress_and_remake_dir(files)

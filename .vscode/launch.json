@@ -11,9 +11,9 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "test/pyrho_1079437",
-                "remake",
-                "3",
+                "test/pyrho",
+                "compress",
+                "2",
                 "0.01"
             ]
         }
