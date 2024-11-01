@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, wait
+import gzip
 import json
 import sys
 from time import perf_counter
@@ -46,18 +47,30 @@ def compress_func(charge: PGrid, mag: PGrid, dims: list[int]):
 
 
 def store_compressed(chgcar_fn: str, charge, mag, structure, data_aug, dims):
-    np.savez_compressed(f"{chgcar_fn}_compressed.npz", charge=charge, mag=mag, dims=dims)
+    # np.savez_compressed(f"{chgcar_fn}_compressed.npz", charge=charge, mag=mag, dims=dims)
+    with gzip.GzipFile(f"{chgcar_fn}_pyrho_compressed_charge.npy.gz", "w") as fc:
+        np.save(fc, charge)
+    with gzip.GzipFile(f"{chgcar_fn}_pyrho_compressed_mag.npy.gz", "w") as fm:
+        np.save(fm, mag)
+    with open(f"{chgcar_fn}_pyrho_dims.txt", "w") as fd:
+        json.dump(dims, fd)
 
     with open(f"{chgcar_fn}_structure.cif", "w") as f:
         f.write(structure.to(fmt="cif"))
     open(f"{chgcar_fn}_data_aug.txt", "w").write(json.dumps(data_aug))
 
-# TODO: Add methods to get compressed data, decompress, and remake CHGCAR
 def retrieve_compressed(chgcar_fn: str):
-    data = np.load(f"{chgcar_fn}_compressed.npz")
-    charge_compressed = data["charge"]
-    mag_compressed = data["mag"]
-    dims = data["dims"]
+    # data = np.load(f"{chgcar_fn}_compressed.npz")
+    # charge_compressed = data["charge"]
+    # mag_compressed = data["mag"]
+    # dims = data["dims"]
+
+    with gzip.GzipFile(f"{chgcar_fn}_pyrho_compressed_charge.npy.gz", "r") as fc:
+        charge_compressed = np.load(fc)
+    with gzip.GzipFile(f"{chgcar_fn}_pyrho_compressed_mag.npy.gz", "r") as fm:
+        mag_compressed = np.load(fm)
+    with open(f"{chgcar_fn}_pyrho_dims.txt", "r") as fd:
+        dims = json.load(fd)
 
     parser = CifParser(f"{chgcar_fn}_structure.cif")
     structure = parser.parse_structures()[0]
