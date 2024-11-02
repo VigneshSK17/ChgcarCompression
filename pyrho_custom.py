@@ -10,7 +10,7 @@ from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.outputs import Chgcar
 from pyrho.charge_density import ChargeDensity, PGrid
 
-from utils import chgcar, io
+from utils import chgcar, io, io2
 
 """
 sys.argv[1] = chgcar_folder
@@ -184,9 +184,9 @@ def main():
     files = io.get_files_in_dir(folder)
 
     if method == "compress":
-        orig_values, all_metrics = compress_dir(files)
+        orig_values, all_metrics = io2.compress_dir(files, compress_file_helper, "pyrho")
         for file_no_ext, file_metrics in all_metrics.items():
-            print(file_no_ext, "Compression Duration: ", file_metrics["compress_duration"])
+            print(file_no_ext, "Compression Duration: ", file_metrics["compress_duration"], "s")
 
     if method == "decompress":
         decompressed_values = decompress_and_remake_dir(files)

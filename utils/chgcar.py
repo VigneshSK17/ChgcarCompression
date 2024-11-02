@@ -1,4 +1,9 @@
+import json
 import numpy as np
+from pymatgen.core.structure import Structure
+from pymatgen.io.cif import CifParser
+from pymatgen.io.vasp.outputs import Chgcar
+from pyrho.charge_density import ChargeDensity, PGrid
 
 import math
 
@@ -139,6 +144,25 @@ def raw_to_data(raw_file: str):
     with open(raw_file, "rb") as fi:
         arr = np.frombuffer(fi.read())
         return arr
+
+# Pymatgen Methods
+def parse_chgcar_pymatgen(chgcar_fn: str):
+    vasp_cden = Chgcar.from_file(chgcar_fn)
+    cden = ChargeDensity.from_file(chgcar_fn)
+
+    structure: Structure = cden.structure
+    charge = cden.pgrids["total"]
+    mag = cden.pgrids["diff"]
+    data_aug = vasp_cden.as_dict()["data_aug"]
+    dims = cden.grid_shape
+
+    return structure, charge, mag, data_aug, dims
+
+
+def store_structure_aug_pymatgen(file_no_ext: str, structure: Structure, data_aug):
+    with open(f"{file_no_ext}_structure.cif", "w") as f:
+        f.write(structure.to(fmt="cif"))
+    open(f"{file_no_ext}_data_aug.txt", "w").write(json.dumps(data_aug))
 
 
 # Math
