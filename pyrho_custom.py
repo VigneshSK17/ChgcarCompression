@@ -60,11 +60,17 @@ def store_compressed(chgcar_fn: str, charge, mag, structure, data_aug, dims):
         f.write(structure.to(fmt="cif"))
     open(f"{chgcar_fn}_data_aug.txt", "w").write(json.dumps(data_aug))
 
-def retrieve_compressed(chgcar_fn: str):
-    # data = np.load(f"{chgcar_fn}_compressed.npz")
-    # charge_compressed = data["charge"]
-    # mag_compressed = data["mag"]
-    # dims = data["dims"]
+def get_file_no_ext(file: str):
+    paths = file.split("/")
+    only_file_name = paths[-1].split("_")[0] + "_chgcar"
+    return "/".join(paths[:-1]) + "/" + only_file_name
+
+def retrieve_compressed(file: str):
+    chgcar_fn = get_file_no_ext(file)
+    files_required = [f"{chgcar_fn}_pyrho_compressed_charge.npy.gz", f"{chgcar_fn}_pyrho_compressed_mag.npy.gz", f"{chgcar_fn}_pyrho_dims.txt", f"{chgcar_fn}_structure.cif", f"{chgcar_fn}_data_aug.txt"]
+    if not all(io.check_file(f) for f in files_required):
+        print(file, ": Missing files for decompression")
+        return None
 
     with gzip.GzipFile(f"{chgcar_fn}_pyrho_compressed_charge.npy.gz", "r") as fc:
         charge_compressed = np.load(fc)
@@ -105,12 +111,23 @@ def remake_chgcar(chgcar_fn: str, charge_pgrid: PGrid, mag_pgrid: PGrid, structu
     chgcar.data_aug = data_aug
     chgcar.write_file(f"{chgcar_fn}_pyrho.vasp")
 
+
 def compress_file_helper(file: str, file_no_ext: str):
     structure, charge, mag, data_aug, dims = parse_chgcar(file)
     charge_compressed, mag_compressed, compress_duration = compress_func(charge, mag, dims)
     store_compressed(file_no_ext, charge_compressed, mag_compressed, structure, data_aug, dims)
 
     return file_no_ext, charge, mag, compress_duration
+
+def decompress_file_helper(file: str):
+    if retrieve_compressed(file) is None:
+        return None
+    charge_compressed, mag_compressed, dims, structure, lattice, data_aug = retrieve_compressed(file)
+
+    decompress_charge, decompress_charge_duration = decompress_func(charge_compressed, lattice, dims)
+    decompress_mag, decompress_mag_duration = decompress_func(mag_compressed, lattice, dims)
+
+    return get_file_no_ext(file), decompress_charge, decompress_mag, decompress_charge_duration + decompress_mag_duration
 
 def compress_dir(files: list[str]):
     orig_values = {}
@@ -140,9 +157,6 @@ def decompress_and_remake_dir(files: list[str]):
     decompressed_values = {}
     with ThreadPoolExecutor() as executor:
         for file in files:
-            paths = file.split("/")
-            only_file_name = paths[-1].split("_")[0] + "_chgcar"
-            file_name = "/".join(paths[:-1]) + "/" + only_file_name
 
             if file_name in decompressed_values:
                 continue
@@ -189,9 +203,9 @@ def main():
             print(file_no_ext, "Compression Duration: ", file_metrics["compress_duration"], "s")
 
     if method == "decompress":
-        decompressed_values = decompress_and_remake_dir(files)
-        for file_name, (charge, mag) in decompressed_values.items():
-            print(file_name, charge.grid_shape, mag.grid_shape)
+        decompressed_values, all_metrics = io2.decompress_dir(files, decompress_file_helper)
+        for file_no_ext, file_metrics in all_metrics.items():
+            print(file_no_ext, "Decompression Duration: ", file_metrics["decompress_duration"], "s")
 
     # Compresses and then decompresses CHGCAR's, provides MAE
     # TODO: Rework for the changed compress_dir and decompress_dir

@@ -58,6 +58,9 @@ def compress_func(chgcar_fn: str, section: str, dims: list[int]):
 
     return time_end - time_start
 
+def get_file_no_ext(file: str):
+    return file.split(".")[0]
+
 
 def decompress_func(compressed_fn: str):
     start_decompress = resource.getrusage(resource.RUSAGE_CHILDREN)

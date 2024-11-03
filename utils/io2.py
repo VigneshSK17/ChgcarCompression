@@ -29,43 +29,33 @@ def compress_dir(files: list[str], compress_file_func, compressor_name: str, wri
 
         return orig_values, metrics
 
-def decompress_dir(files: list[str], decompress_func):
+def decompress_dir(files: list[str], decompress_file_func):
     decompressed_values = {}
+    metrics = defaultdict(dict)
     with ThreadPoolExecutor() as executor:
+        decompress_file_futures = []
         for file in files:
-            file_name = file.split(".")[0]
+            # TODO: Move get_file_no_ext here
+            file_no_ext = file.split(".")[0]
 
-            if "no_data" in file_name:
-                continue
+            # TODO: Have file checks in retrieve_compressed
 
-            future_decompress = executor.submit(decompress_func, file_name)
-            wait([future_decompress])
+            # TODO: Make tthresh run compression of both charge and mag in here
+            future_decompress_file = executor.submit(decompress_file_func, file)
+            decompress_file_futures.append(future_decompress_file)
 
-            future_decompress_values = executor.submit(raw_to_data, f"{file_name}_decompressed.raw")
-
-            if "charge" in file_name:
-                file_name_prefix = file_name.split("_charge")[0]
-
-                if file_name_prefix not in decompressed_values:
-                    decompressed_values[file_name_prefix] = [future_decompress_values.result()]
-                else:
-                    decompressed_values[file_name_prefix].insert(0, future_decompress_values.result())
-            elif "mag" in file_name:
-                file_name_prefix = file_name.split("_mag")[0]
-
-                if file_name_prefix not in decompressed_values:
-                    decompressed_values[file_name_prefix] = [future_decompress_values.result()]
-                else:
-                    decompressed_values[file_name_prefix].append(future_decompress_values.result())
-
-
+        for future in as_completed(decompress_file_futures):
+            if future.result():
+                file_no_ext, charge, mag, decompress_duratoin = future.result()
+                decompressed_values[file_no_ext] = [charge, mag]
+                metrics[file_no_ext]["decompress_duration"] = decompress_duratoin
 
             """
             TODO
             - Store values based on file_name_orig into dict
             - Combine all values into CHGCAR, get nodata files somehow (separate func?)
             """
-        return decompressed_values
+        return decompressed_values, metrics
 
 # TODO: Implement
 def remake_chgcar_dir(files: list[str], decompressed_values):

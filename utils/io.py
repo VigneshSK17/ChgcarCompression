@@ -93,3 +93,6 @@ def get_files_in_dir(directory: str):
 
 def check_dir(directory: str):
     return os.path.exists(directory)
+
+def check_file(file: str):
+    return os.path.isfile(file)

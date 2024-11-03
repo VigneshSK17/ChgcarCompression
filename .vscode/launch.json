@@ -10,18 +10,18 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": [
-                "test/tthresh",
-                "compress",
-                "-e",
-                "0.01"
-            ]
             // "args": [
-            //     "test/pyrho",
+            //     "test/tthresh",
             //     "compress",
-            //     "2",
+            //     "-e",
             //     "0.01"
             // ]
+            "args": [
+                "test/pyrho",
+                "decompress",
+                // "2",
+                // "0.01"
+            ]
         }
     ]
 }
