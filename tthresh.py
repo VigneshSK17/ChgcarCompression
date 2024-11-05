@@ -49,7 +49,6 @@ def compress_file_helper(file: str, file_no_ext: str):
     charge_compress_duration = compress_func(file_no_ext, "charge", dims)
     mag_compress_duration = compress_func(file_no_ext, "mag", dims)
 
-    # TODO: Add dims to the stored files, read it in as well
     chgcar.store_structure_aug_dims_pymatgen(file_no_ext, structure, data_aug, dims)
 
     return file_no_ext, charge, mag, charge_compress_duration + mag_compress_duration
@@ -77,7 +76,7 @@ def decompress_file_helper(file: str):
     chgcar_fn = io2.get_only_file_name(file)
     files_required = [f"{chgcar_fn}_tthresh_charge_compressed.raw", f"{chgcar_fn}_tthresh_mag_compressed.raw", f"{chgcar_fn}_structure.cif", f"{chgcar_fn}_data_aug.txt", f"{chgcar_fn}_dims.txt"]
     if not io2.check_files(files_required):
-        print(file, ": Missing files for decompression")
+        print(f"{file}: Missing files for decompression")
         return None
 
     decompress_charge_duration = decompress_func(f"{chgcar_fn}_tthresh_charge_compressed.raw")

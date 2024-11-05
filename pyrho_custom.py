@@ -60,7 +60,7 @@ def retrieve_compressed(file: str):
     chgcar_fn = io2.get_only_file_name(file)
     files_required = [f"{chgcar_fn}_pyrho_compressed_charge.npy.gz", f"{chgcar_fn}_pyrho_compressed_mag.npy.gz", f"{chgcar_fn}_dims.txt", f"{chgcar_fn}_structure.cif", f"{chgcar_fn}_data_aug.txt"]
     if not io2.check_files(files_required):
-        print(file, ": Missing files for decompression")
+        print(f"{file}: Missing files for decompression")
         return None
 
     with gzip.GzipFile(f"{chgcar_fn}_pyrho_compressed_charge.npy.gz", "r") as fc:
@@ -194,18 +194,27 @@ def main():
             print(file_no_ext, "Decompression Duration: ", file_metrics["decompress_duration"], "s")
 
     # Compresses and then decompresses CHGCAR's, provides MAE
-    # TODO: Rework for the changed compress_dir and decompress_dir
     if method == "remake":
-        orig_values = compress_dir(files)
-        decompressed_values = decompress_and_remake_dir(files)
+        print("Starting compression...")
+        orig_values, compress_metrics = io2.compress_dir(files, compress_file_helper, "pyrho")
+        print("Starting decompression...")
+        decompressed_values, decompress_metrics = io2.decompress_dir(files, decompress_file_helper, "pyrho")
 
-        for file_name in orig_values.keys():
-            orig = orig_values[file_name]
-            decompressed = decompressed_values[file_name]
-            print(file_name, "Charge Density MAE: ", chgcar.mae(orig[0].grid_data, decompressed[0].grid_data))
-            print(file_name, "Mag Density MAE: ", chgcar.mae(orig[1].grid_data, decompressed[1].grid_data))
-            print(file_name, "Charge Density Avg Percentage Difference: ", chgcar.mean_percentage_diff(orig[0].grid_data, decompressed[0].grid_data))
-            print(file_name, "Mag Density Avg Percentage Difference: ", chgcar.mean_percentage_diff(orig[1].grid_data, decompressed[1].grid_data))
+        all_metrics = defaultdict(dict)
+        for file_no_ext in compress_metrics.keys():
+            for k, v in compress_metrics[file_no_ext].items():
+                all_metrics[file_no_ext][k] = v
+            for k, v in decompress_metrics[file_no_ext].items():
+                all_metrics[file_no_ext][k] = v
+
+        for file_no_ext in orig_values.keys():
+            orig, decompressed = orig_values[file_no_ext], decompressed_values[file_no_ext]
+            all_metrics[file_no_ext]["charge_mae"] = chgcar.mae(orig[0].grid_data, decompressed[0].grid_data)
+            all_metrics[file_no_ext]["mag_mae"] = chgcar.mae(orig[1].grid_data, decompressed[1].grid_data)
+            all_metrics[file_no_ext]["charge_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[0].grid_data, decompressed[0].grid_data)
+            all_metrics[file_no_ext]["mag_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[1].grid_data, decompressed[1].grid_data)
+
+        print(json.dumps(all_metrics, sort_keys=True, indent=4))
 
 
 if __name__ == "__main__":
