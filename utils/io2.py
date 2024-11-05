@@ -2,6 +2,7 @@ from collections import defaultdict
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 
+from utils import chgcar
 from utils.chgcar import *
 
 def compress_dir(files: list[str], compress_file_func, compressor_name: str, write_raw = False):
@@ -29,7 +30,7 @@ def compress_dir(files: list[str], compress_file_func, compressor_name: str, wri
 
         return orig_values, metrics
 
-def decompress_dir(files: list[str], decompress_file_func):
+def decompress_dir(files: list[str], decompress_file_func, compressor_name: str):
     decompressed_values = {}
     metrics = defaultdict(dict)
     with ThreadPoolExecutor() as executor:
@@ -46,9 +47,18 @@ def decompress_dir(files: list[str], decompress_file_func):
 
         for future in as_completed(decompress_file_futures):
             if future.result():
-                file_no_ext, charge, mag, decompress_duratoin = future.result()
+                file_no_ext, structure, data_aug, charge, mag, decompress_duration = future.result()
+
+                cgden = chgcar.remake_chgcar_pymatgen(
+                    charge,
+                    mag,
+                    structure,
+                    data_aug
+                )
+                cgden.write_file(f"{file_no_ext}_{compressor_name}.vasp")
+
                 decompressed_values[file_no_ext] = [charge, mag]
-                metrics[file_no_ext]["decompress_duration"] = decompress_duratoin
+                metrics[file_no_ext]["decompress_duration"] = decompress_duration
 
             """
             TODO
@@ -78,8 +88,16 @@ def decompress_and_remake_dir(files: list[str], decompress_func):
         future_remake_chgcar_dir = executor.submit(remake_chgcar_dir, files, future_decompress_values.result())
 
 # Helpers
+def get_only_file_name(file: str):
+    paths = file.split("/")
+    only_file_name = paths[-1].split("_")[0] + "_chgcar"
+    return "/".join(paths[:-1]) + "/" + only_file_name
+
 def get_files_in_dir(directory: str):
     return [os.path.join(directory, f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
 
 def check_dir(directory: str):
     return os.path.exists(directory)
+
+def check_files(files: list[str]):
+    return all(os.path.exists(f) for f in files)

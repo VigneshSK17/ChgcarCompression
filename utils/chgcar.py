@@ -159,11 +159,28 @@ def parse_chgcar_pymatgen(chgcar_fn: str):
     return structure, charge, mag, data_aug, dims
 
 
-def store_structure_aug_pymatgen(file_no_ext: str, structure: Structure, data_aug):
+def store_structure_aug_dims_pymatgen(file_no_ext: str, structure: Structure, data_aug, dims: list[int]):
     with open(f"{file_no_ext}_structure.cif", "w") as f:
         f.write(structure.to(fmt="cif"))
     open(f"{file_no_ext}_data_aug.txt", "w").write(json.dumps(data_aug))
+    open(f"{file_no_ext}_dims.txt", "w").write(json.dumps(dims))
 
+def retrieve_structure_aug_dims_pymatgen(file_no_ext: str):
+    parser = CifParser(f"{file_no_ext}_structure.cif")
+    structure = parser.parse_structures()[0]
+    lattice = structure.lattice.matrix
+    data_aug = json.loads(open(f"{file_no_ext}_data_aug.txt").read())
+    with open(f"{file_no_ext}_dims.txt", "r") as fd:
+        dims = json.load(fd)
+
+    return structure, lattice, data_aug, dims
+
+def remake_chgcar_pymatgen(charge_pgrid: PGrid, mag_pgrid: PGrid, structure: Structure, data_aug):
+    cgden = ChargeDensity(pgrids={"total": charge_pgrid, "diff": mag_pgrid}, structure=structure)
+
+    chgcar = cgden.to_Chgcar()
+    chgcar.data_aug = data_aug
+    return chgcar
 
 # Math
 def mae(actual: np.ndarray, predicted: np.ndarray):

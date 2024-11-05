@@ -27,9 +27,12 @@ def main():
             print(file_no_ext, "Compression Duration: ", file_metrics["compress_duration"], "s")
 
     if method == "decompress":
-        decompressed_values = io.decompress_dir(files, decompress_func)
-        for file_name, (charge, mag) in decompressed_values.items():
-            print(file_name, charge.shape, mag.shape)
+        # decompressed_values = io.decompress_dir(files, decompress_func)
+        # for file_name, (charge, mag) in decompressed_values.items():
+        #     print(file_name, charge.shape, mag.shape)
+        decompressed_values, all_metrics = io2.decompress_dir(files, decompress_file_helper, "tthresh")
+        for file_no_ext, file_metrics in all_metrics.items():
+            print(file_no_ext, "Decompression Duration: ", file_metrics["decompress_duration"], "s")
 
     if method == "remake":
         io.decompress_and_remake_dir(files, decompress_func)
@@ -46,29 +49,51 @@ def compress_file_helper(file: str, file_no_ext: str):
     charge_compress_duration = compress_func(file_no_ext, "charge", dims)
     mag_compress_duration = compress_func(file_no_ext, "mag", dims)
 
-    chgcar.store_structure_aug_pymatgen(file_no_ext, structure, data_aug)
+    # TODO: Add dims to the stored files, read it in as well
+    chgcar.store_structure_aug_dims_pymatgen(file_no_ext, structure, data_aug, dims)
 
     return file_no_ext, charge, mag, charge_compress_duration + mag_compress_duration
 
 def compress_func(chgcar_fn: str, section: str, dims: list[int]):
     time_start = perf_counter()
     cmd = get_tthresh_compress_cmd(chgcar_fn, section, dims)
+    res = subprocess.run(cmd)
+    time_end = perf_counter()
+
+    return time_end - time_start
+
+
+def decompress_func(compressed_fn: str):
+    file_no_ext = compressed_fn.split(".")[0]
+
+    time_start = perf_counter()
+    cmd = get_tthresh_decompress_cmd(file_no_ext)
     subprocess.run(cmd)
     time_end = perf_counter()
 
     return time_end - time_start
 
-def get_file_no_ext(file: str):
-    return file.split(".")[0]
+def decompress_file_helper(file: str):
+    chgcar_fn = io2.get_only_file_name(file)
+    files_required = [f"{chgcar_fn}_tthresh_charge_compressed.raw", f"{chgcar_fn}_tthresh_mag_compressed.raw", f"{chgcar_fn}_structure.cif", f"{chgcar_fn}_data_aug.txt", f"{chgcar_fn}_dims.txt"]
+    if not io2.check_files(files_required):
+        print(file, ": Missing files for decompression")
+        return None
 
+    decompress_charge_duration = decompress_func(f"{chgcar_fn}_tthresh_charge_compressed.raw")
+    decompress_mag_duration = decompress_func(f"{chgcar_fn}_tthresh_mag_compressed.raw")
 
-def decompress_func(compressed_fn: str):
-    start_decompress = resource.getrusage(resource.RUSAGE_CHILDREN)
-    cmd = get_tthresh_decompress_cmd(compressed_fn)
-    subprocess.run(cmd)
-    end_decompress = resource.getrusage(resource.RUSAGE_CHILDREN)
+    decompress_charge = chgcar.raw_to_data(f"{chgcar_fn}_tthresh_charge_compressed_decompressed.raw")
+    decompress_mag = chgcar.raw_to_data(f"{chgcar_fn}_tthresh_mag_compressed_decompressed.raw")
+    structure, lattice, data_aug, dims = chgcar.retrieve_structure_aug_dims_pymatgen(chgcar_fn)
 
-    print(f"{compressed_fn} Decompression Time: {end_decompress.ru_utime - start_decompress.ru_utime}s")
+    decompress_charge = decompress_charge.reshape(dims)
+    decompress_mag = decompress_mag.reshape(dims)
+
+    charge_pgrid, mag_pgrid = PGrid(decompress_charge, lattice), PGrid(decompress_mag, lattice)
+
+    return chgcar_fn, structure, data_aug, charge_pgrid, mag_pgrid, decompress_charge_duration + decompress_mag_duration
+
 
 def get_tthresh_compress_cmd(chgcar_fn: str, section: str, dims: list[int]):
     cmd =  [TTHRESH_BIN,

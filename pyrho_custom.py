@@ -53,22 +53,13 @@ def store_compressed(chgcar_fn: str, charge, mag, structure, data_aug, dims):
         np.save(fc, charge)
     with gzip.GzipFile(f"{chgcar_fn}_pyrho_compressed_mag.npy.gz", "w") as fm:
         np.save(fm, mag)
-    with open(f"{chgcar_fn}_pyrho_dims.txt", "w") as fd:
-        json.dump(dims, fd)
 
-    with open(f"{chgcar_fn}_structure.cif", "w") as f:
-        f.write(structure.to(fmt="cif"))
-    open(f"{chgcar_fn}_data_aug.txt", "w").write(json.dumps(data_aug))
-
-def get_file_no_ext(file: str):
-    paths = file.split("/")
-    only_file_name = paths[-1].split("_")[0] + "_chgcar"
-    return "/".join(paths[:-1]) + "/" + only_file_name
+    chgcar.store_structure_aug_dims_pymatgen(chgcar_fn, structure, data_aug, dims)
 
 def retrieve_compressed(file: str):
-    chgcar_fn = get_file_no_ext(file)
-    files_required = [f"{chgcar_fn}_pyrho_compressed_charge.npy.gz", f"{chgcar_fn}_pyrho_compressed_mag.npy.gz", f"{chgcar_fn}_pyrho_dims.txt", f"{chgcar_fn}_structure.cif", f"{chgcar_fn}_data_aug.txt"]
-    if not all(io.check_file(f) for f in files_required):
+    chgcar_fn = io2.get_only_file_name(file)
+    files_required = [f"{chgcar_fn}_pyrho_compressed_charge.npy.gz", f"{chgcar_fn}_pyrho_compressed_mag.npy.gz", f"{chgcar_fn}_dims.txt", f"{chgcar_fn}_structure.cif", f"{chgcar_fn}_data_aug.txt"]
+    if not io2.check_files(files_required):
         print(file, ": Missing files for decompression")
         return None
 
@@ -76,15 +67,10 @@ def retrieve_compressed(file: str):
         charge_compressed = np.load(fc)
     with gzip.GzipFile(f"{chgcar_fn}_pyrho_compressed_mag.npy.gz", "r") as fm:
         mag_compressed = np.load(fm)
-    with open(f"{chgcar_fn}_pyrho_dims.txt", "r") as fd:
-        dims = json.load(fd)
 
-    parser = CifParser(f"{chgcar_fn}_structure.cif")
-    structure = parser.parse_structures()[0]
-    lattice = structure.lattice.matrix
-    data_aug = json.loads(open(f"{chgcar_fn}_data_aug.txt").read())
+    structure, lattice, data_aug, dims = chgcar.retrieve_structure_aug_dims_pymatgen(chgcar_fn)
 
-    return charge_compressed, mag_compressed, dims, structure, lattice, data_aug
+    return chgcar_fn, charge_compressed, mag_compressed, dims, structure, lattice, data_aug
 
 
 def decompress_func(data: np.ndarray, lattice: np.ndarray, dims: list[int]):
@@ -122,12 +108,12 @@ def compress_file_helper(file: str, file_no_ext: str):
 def decompress_file_helper(file: str):
     if retrieve_compressed(file) is None:
         return None
-    charge_compressed, mag_compressed, dims, structure, lattice, data_aug = retrieve_compressed(file)
+    chgcar_fn, charge_compressed, mag_compressed, dims, structure, lattice, data_aug = retrieve_compressed(file)
 
     decompress_charge, decompress_charge_duration = decompress_func(charge_compressed, lattice, dims)
     decompress_mag, decompress_mag_duration = decompress_func(mag_compressed, lattice, dims)
 
-    return get_file_no_ext(file), decompress_charge, decompress_mag, decompress_charge_duration + decompress_mag_duration
+    return chgcar_fn, structure, data_aug, decompress_charge, decompress_mag, decompress_charge_duration + decompress_mag_duration
 
 def compress_dir(files: list[str]):
     orig_values = {}
@@ -203,7 +189,7 @@ def main():
             print(file_no_ext, "Compression Duration: ", file_metrics["compress_duration"], "s")
 
     if method == "decompress":
-        decompressed_values, all_metrics = io2.decompress_dir(files, decompress_file_helper)
+        decompressed_values, all_metrics = io2.decompress_dir(files, decompress_file_helper, "pyrho")
         for file_no_ext, file_metrics in all_metrics.items():
             print(file_no_ext, "Decompression Duration: ", file_metrics["decompress_duration"], "s")
 
