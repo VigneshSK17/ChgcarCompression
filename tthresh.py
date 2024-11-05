@@ -1,3 +1,5 @@
+from collections import defaultdict
+import json
 import resource
 import sys
 import subprocess
@@ -35,7 +37,26 @@ def main():
             print(file_no_ext, "Decompression Duration: ", file_metrics["decompress_duration"], "s")
 
     if method == "remake":
-        io.decompress_and_remake_dir(files, decompress_func)
+        print("Starting compression...")
+        orig_values, compress_metrics = io2.compress_dir(files, compress_file_helper, "pyrho")
+        print("Starting decompression...")
+        decompressed_values, decompress_metrics = io2.decompress_dir(files, decompress_file_helper, "pyrho")
+
+        all_metrics = defaultdict(dict)
+        for file_no_ext in compress_metrics.keys():
+            for k, v in compress_metrics[file_no_ext].items():
+                all_metrics[file_no_ext][k] = v
+            for k, v in decompress_metrics[file_no_ext].items():
+                all_metrics[file_no_ext][k] = v
+
+        for file_no_ext in orig_values.keys():
+            orig, decompressed = orig_values[file_no_ext], decompressed_values[file_no_ext]
+            all_metrics[file_no_ext]["charge_mae"] = chgcar.mae(orig[0].grid_data, decompressed[0].grid_data)
+            all_metrics[file_no_ext]["mag_mae"] = chgcar.mae(orig[1].grid_data, decompressed[1].grid_data)
+            all_metrics[file_no_ext]["charge_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[0].grid_data, decompressed[0].grid_data)
+            all_metrics[file_no_ext]["mag_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[1].grid_data, decompressed[1].grid_data)
+
+        print(json.dumps(all_metrics, sort_keys=True, indent=4))
 
 def compress_file_helper(file: str, file_no_ext: str):
     structure, charge_pgrid, mag_pgrid, data_aug, dims = chgcar.parse_chgcar_pymatgen(file)
@@ -51,7 +72,7 @@ def compress_file_helper(file: str, file_no_ext: str):
 
     chgcar.store_structure_aug_dims_pymatgen(file_no_ext, structure, data_aug, dims)
 
-    return file_no_ext, charge, mag, charge_compress_duration + mag_compress_duration
+    return file_no_ext, charge_pgrid, mag_pgrid, charge_compress_duration + mag_compress_duration
 
 def compress_func(chgcar_fn: str, section: str, dims: list[int]):
     time_start = perf_counter()
