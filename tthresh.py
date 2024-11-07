@@ -24,7 +24,7 @@ def main():
     files = io2.get_files_in_dir(folder)
 
     if method == "compress":
-        orig_values, all_metrics = io2.compress_dir(files, compress_file_helper, "tthresh", write_raw=True)
+        orig_values, all_metrics = io2.compress_dir(files, compress_file_helper, "tthresh", write=True)
         for file_no_ext, file_metrics in all_metrics.items():
             print(file_no_ext, "Compression Duration: ", file_metrics["compress_duration"], "s")
 

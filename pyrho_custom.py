@@ -97,81 +97,32 @@ def remake_chgcar(chgcar_fn: str, charge_pgrid: PGrid, mag_pgrid: PGrid, structu
     chgcar.data_aug = data_aug
     chgcar.write_file(f"{chgcar_fn}_pyrho.vasp")
 
-
-def compress_file_helper(file: str, file_no_ext: str):
+def compress_data(file: str, file_no_ext: str):
     structure, charge, mag, data_aug, dims = parse_chgcar(file)
     charge_compressed, mag_compressed, compress_duration = compress_func(charge, mag, dims)
+
+    return file_no_ext, structure, charge, mag, data_aug, dims, charge_compressed, mag_compressed, compress_duration
+
+def compress_file_helper(file: str, file_no_ext: str):
+    _, structure, charge, mag, data_aug, dims, charge_compressed, mag_compressed, compress_duration = compress_data(file, file_no_ext)
     store_compressed(file_no_ext, charge_compressed, mag_compressed, structure, data_aug, dims)
 
     return file_no_ext, charge, mag, compress_duration
+
+def decompress_data(file_no_ext, charge, mag, lattice, dims):
+    decompress_charge, decompress_charge_duration = decompress_func(charge, lattice, dims)
+    decompress_mag, decompress_mag_duration = decompress_func(mag, lattice, dims)
+
+    return file_no_ext, decompress_charge, decompress_mag, decompress_charge_duration + decompress_mag_duration
 
 def decompress_file_helper(file: str):
     if retrieve_compressed(file) is None:
         return None
     chgcar_fn, charge_compressed, mag_compressed, dims, structure, lattice, data_aug = retrieve_compressed(file)
 
-    decompress_charge, decompress_charge_duration = decompress_func(charge_compressed, lattice, dims)
-    decompress_mag, decompress_mag_duration = decompress_func(mag_compressed, lattice, dims)
+    _, decompress_charge, decompress_mag, decompress_duration = decompress_data(chgcar_fn, charge_compressed, mag_compressed, lattice, dims)
 
-    return chgcar_fn, structure, data_aug, decompress_charge, decompress_mag, decompress_charge_duration + decompress_mag_duration
-
-def compress_dir(files: list[str]):
-    orig_values = {}
-    metrics = defaultdict(dict)
-
-    with ThreadPoolExecutor() as executor:
-        compress_file_futures = []
-        for file in files:
-            file_no_ext = file.split(".")[0]
-            extension = file.split(".")[1]
-
-            if file_no_ext in orig_values or extension != "vasp":
-                continue
-
-            future_compress_file = executor.submit(compress_file_helper, file, file_no_ext)
-            compress_file_futures.append(future_compress_file)
-
-        for future in as_completed(compress_file_futures):
-            file_no_ext, charge, mag, compress_duration = future.result()
-            orig_values[file_no_ext] = [charge, mag]
-            metrics[file_no_ext]["compress_duration"] = compress_duration
-            # TODO: Add file size metrics
-
-    return orig_values, metrics
-
-def decompress_and_remake_dir(files: list[str]):
-    decompressed_values = {}
-    with ThreadPoolExecutor() as executor:
-        for file in files:
-
-            if file_name in decompressed_values:
-                continue
-
-            future_decompress = executor.submit(retrieve_compressed, file_name)
-            charge_compressed, mag_compressed, dims, structure, lattice, data_aug = future_decompress.result()
-
-            # shape = [dim * int(sys.argv[3]) for dim in charge_compressed.shape]
-
-            # future_decompress_charge = executor.submit(decompress_func, charge_compressed, lattice, shape)
-            # future_decompress_mag = executor.submit(decompress_func, mag_compressed, lattice, shape)
-            future_decompress_charge = executor.submit(decompress_func, charge_compressed, lattice, dims)
-            future_decompress_mag = executor.submit(decompress_func, mag_compressed, lattice, dims)
-
-
-            decompress_charge, decompress_charge_duration = future_decompress_charge.result()
-            decompress_mag, decompress_mag_duration = future_decompress_mag.result()
-
-            decompressed_values[file_name] = [decompress_charge, decompress_mag]
-
-            # Remaking chgcar
-            future_remake_chgcar = executor.submit(remake_chgcar, file_name, decompress_charge, decompress_mag, structure, data_aug)
-
-            future_remake_chgcar.result()
-
-            print(f"{file_name} - Decompression Duration: {decompress_charge_duration + decompress_mag_duration} s\n\t Charge Decompression: {decompress_charge_duration} s\n\t Mag Decompression: {decompress_mag_duration} s")
-
-    return decompressed_values
-
+    return chgcar_fn, structure, data_aug, decompress_charge, decompress_mag, decompress_duration
 
 
 def main():
@@ -215,6 +166,29 @@ def main():
             all_metrics[file_no_ext]["mag_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[1].grid_data, decompressed[1].grid_data)
 
         print(json.dumps(all_metrics, sort_keys=True, indent=4))
+
+    if method == "remake_no_file":
+        print("Starting compression...")
+        orig_values, compressed_values, compress_metrics = io2.compress_dir(files, compress_data, "pyrho", write=False)
+        print("Starting decompression...")
+        decompressed_values, decompress_metrics = io2.decompress_dir_no_file(compressed_values, decompress_data)
+
+        all_metrics = defaultdict(dict)
+        for file_no_ext in compress_metrics.keys():
+            for k, v in compress_metrics[file_no_ext].items():
+                all_metrics[file_no_ext][k] = v
+            for k, v in decompress_metrics[file_no_ext].items():
+                all_metrics[file_no_ext][k] = v
+
+        for file_no_ext in orig_values.keys():
+            orig, decompressed = orig_values[file_no_ext], decompressed_values[file_no_ext]
+            all_metrics[file_no_ext]["charge_mae"] = chgcar.mae(orig[0].grid_data, decompressed[0].grid_data)
+            all_metrics[file_no_ext]["mag_mae"] = chgcar.mae(orig[1].grid_data, decompressed[1].grid_data)
+            all_metrics[file_no_ext]["charge_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[0].grid_data, decompressed[0].grid_data)
+            all_metrics[file_no_ext]["mag_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[1].grid_data, decompressed[1].grid_data)
+
+        print(json.dumps(all_metrics, sort_keys=True, indent=4))
+
 
 
 if __name__ == "__main__":

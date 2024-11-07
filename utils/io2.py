@@ -5,9 +5,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 from utils import chgcar
 from utils.chgcar import *
 
-def compress_dir(files: list[str], compress_file_func, compressor_name: str, write_raw = False):
+def compress_dir(files: list[str], compress_file_func, compressor_name: str, write = True):
 
     orig_values = {}
+    compressed_values = {}
     metrics = defaultdict(dict)
 
     with ThreadPoolExecutor() as executor:
@@ -23,12 +24,20 @@ def compress_dir(files: list[str], compress_file_func, compressor_name: str, wri
             compress_file_futures.append(future_compress_file)
 
         for future in as_completed(compress_file_futures):
-            file_no_ext, charge, mag, compress_duration = future.result()
+            if write:
+                file_no_ext, charge, mag, compress_duration = future.result()
+            else:
+                file_no_ext, structure, charge, mag, _, dims, charge_compressed, mag_compressed, compress_duration = future.result()
+                compressed_values[file_no_ext] = [charge_compressed, mag_compressed, structure.lattice.matrix, dims]
+
             orig_values[file_no_ext] = [charge, mag]
             metrics[file_no_ext]["compress_duration"] = compress_duration
             # TODO: Add file size metrics, mandate compression duration for both charge and mag
 
-        return orig_values, metrics
+        if write:
+            return orig_values, metrics
+        else:
+            return orig_values, compressed_values, metrics
 
 def decompress_dir(files: list[str], decompress_file_func, compressor_name: str):
     decompressed_values = {}
@@ -36,12 +45,7 @@ def decompress_dir(files: list[str], decompress_file_func, compressor_name: str)
     with ThreadPoolExecutor() as executor:
         decompress_file_futures = []
         for file in files:
-            # TODO: Move get_file_no_ext here
             file_no_ext = file.split(".")[0]
-
-            # TODO: Have file checks in retrieve_compressed
-
-            # TODO: Make tthresh run compression of both charge and mag in here
             future_decompress_file = executor.submit(decompress_file_func, file)
             decompress_file_futures.append(future_decompress_file)
 
@@ -60,11 +64,24 @@ def decompress_dir(files: list[str], decompress_file_func, compressor_name: str)
                 decompressed_values[file_no_ext] = [charge, mag]
                 metrics[file_no_ext]["decompress_duration"] = decompress_duration
 
-            """
-            TODO
-            - Store values based on file_name_orig into dict
-            - Combine all values into CHGCAR, get nodata files somehow (separate func?)
-            """
+        return decompressed_values, metrics
+
+def decompress_dir_no_file(compressed_values, decompress_func):
+    decompressed_values = {}
+    metrics = defaultdict(dict)
+    with ThreadPoolExecutor() as executor:
+        decompress_file_futures = []
+        for file_no_ext, values in compressed_values.items():
+            charge_compressed, mag_compressed, lattice, dims = values
+            future_decompress_file = executor.submit(decompress_func, file_no_ext, charge_compressed, mag_compressed, lattice, dims)
+            decompress_file_futures.append(future_decompress_file)
+
+        for future in as_completed(decompress_file_futures):
+            if future.result():
+                file_no_ext, charge, mag, decompress_duration = future.result()
+                decompressed_values[file_no_ext] = [charge, mag]
+                metrics[file_no_ext]["decompress_duration"] = decompress_duration
+
         return decompressed_values, metrics
 
 # TODO: Implement
