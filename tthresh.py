@@ -58,6 +58,42 @@ def main():
 
         print(json.dumps(all_metrics, sort_keys=True, indent=4))
 
+    if method == "remake_no_file":
+        print("Starting compression...")
+        orig_values, _, compress_metrics = io2.compress_dir(files, compress_data, "pyrho", write=False)
+        print("Starting decompression...")
+        decompressed_values, decompress_metrics = io2.decompress_dir_no_file(orig_values, decompress_data, has_data=False)
+
+        all_metrics = defaultdict(dict)
+        for file_no_ext in compress_metrics.keys():
+            for k, v in compress_metrics[file_no_ext].items():
+                all_metrics[file_no_ext][k] = v
+            for k, v in decompress_metrics[file_no_ext].items():
+                all_metrics[file_no_ext][k] = v
+
+        for file_no_ext in orig_values.keys():
+            orig, decompressed = orig_values[file_no_ext], decompressed_values[file_no_ext]
+            all_metrics[file_no_ext]["charge_mae"] = chgcar.mae(orig[0], decompressed[0])
+            all_metrics[file_no_ext]["mag_mae"] = chgcar.mae(orig[1], decompressed[1])
+            all_metrics[file_no_ext]["charge_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[0], decompressed[0])
+            all_metrics[file_no_ext]["mag_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[1], decompressed[1])
+
+        print(json.dumps(all_metrics, sort_keys=True, indent=4))
+
+def compress_data(file: str, file_no_ext: str):
+    structure, charge_pgrid, mag_pgrid, data_aug, dims = chgcar.parse_chgcar_pymatgen(file)
+
+    charge = charge_pgrid.grid_data
+    mag = mag_pgrid.grid_data
+
+    chgcar.data_to_raw(charge, dims, f"{file_no_ext}_tthresh_charge.raw")
+    chgcar.data_to_raw(mag, dims, f"{file_no_ext}_tthresh_mag.raw")
+
+    charge_compress_duration = compress_func(file_no_ext, "charge", dims)
+    mag_compress_duration = compress_func(file_no_ext, "mag", dims)
+
+    return file_no_ext, structure, charge, mag, data_aug, dims, None, None, charge_compress_duration + mag_compress_duration
+
 def compress_file_helper(file: str, file_no_ext: str):
     structure, charge_pgrid, mag_pgrid, data_aug, dims = chgcar.parse_chgcar_pymatgen(file)
 
@@ -92,6 +128,18 @@ def decompress_func(compressed_fn: str):
     time_end = perf_counter()
 
     return time_end - time_start
+
+def decompress_data(file_no_ext, charge, mag, lattice, dims):
+    decompress_charge_duration = decompress_func(f"{file_no_ext}_tthresh_charge_compressed.raw")
+    decompress_mag_duration = decompress_func(f"{file_no_ext}_tthresh_mag_compressed.raw")
+
+    decompress_charge = chgcar.raw_to_data(f"{file_no_ext}_tthresh_charge_compressed_decompressed.raw")
+    decompress_mag = chgcar.raw_to_data(f"{file_no_ext}_tthresh_mag_compressed_decompressed.raw")
+
+    decompress_charge = decompress_charge.reshape(dims)
+    decompress_mag = decompress_mag.reshape(dims)
+
+    return file_no_ext, decompress_charge, decompress_mag, decompress_charge_duration + decompress_mag_duration
 
 def decompress_file_helper(file: str):
     chgcar_fn = io2.get_only_file_name(file)

@@ -28,9 +28,12 @@ def compress_dir(files: list[str], compress_file_func, compressor_name: str, wri
                 file_no_ext, charge, mag, compress_duration = future.result()
             else:
                 file_no_ext, structure, charge, mag, _, dims, charge_compressed, mag_compressed, compress_duration = future.result()
-                compressed_values[file_no_ext] = [charge_compressed, mag_compressed, structure.lattice.matrix, dims]
+                if charge_compressed and mag_compressed:
+                    compressed_values[file_no_ext] = [charge_compressed, mag_compressed, structure.lattice.matrix, dims]
+                    orig_values[file_no_ext] = [charge, mag]
+                else:
+                    orig_values[file_no_ext] = [charge, mag, dims]
 
-            orig_values[file_no_ext] = [charge, mag]
             metrics[file_no_ext]["compress_duration"] = compress_duration
             # TODO: Add file size metrics, mandate compression duration for both charge and mag
 
@@ -66,14 +69,18 @@ def decompress_dir(files: list[str], decompress_file_func, compressor_name: str)
 
         return decompressed_values, metrics
 
-def decompress_dir_no_file(compressed_values, decompress_func):
+def decompress_dir_no_file(compressed_values, decompress_func, has_data = True):
     decompressed_values = {}
     metrics = defaultdict(dict)
     with ThreadPoolExecutor() as executor:
         decompress_file_futures = []
         for file_no_ext, values in compressed_values.items():
-            charge_compressed, mag_compressed, lattice, dims = values
-            future_decompress_file = executor.submit(decompress_func, file_no_ext, charge_compressed, mag_compressed, lattice, dims)
+            if has_data:
+                charge_compressed, mag_compressed, lattice, dims = values
+                future_decompress_file = executor.submit(decompress_func, file_no_ext, charge_compressed, mag_compressed, lattice, dims)
+            else:
+                _, _, dims = values
+                future_decompress_file = executor.submit(decompress_func, file_no_ext, None, None, None, dims)
             decompress_file_futures.append(future_decompress_file)
 
         for future in as_completed(decompress_file_futures):

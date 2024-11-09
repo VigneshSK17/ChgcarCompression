@@ -11,16 +11,18 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
-            // "args": [
-            //     "test/tthresh",
-            //     "decompress",
-            // ]
             "args": [
-                "test/pyrho",
-                "remake",
-                "2",
+                "test/tthresh",
+                "remake_no_file",
+                "-e",
                 "0.01"
             ]
+            // "args": [
+            //     "test/pyrho",
+            //     "remake",
+            //     "2",
+            //     "0.01"
+            // ]
         }
     ]
 }
