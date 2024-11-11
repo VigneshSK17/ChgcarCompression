@@ -1,6 +1,7 @@
 from collections import defaultdict
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait
+import pathlib
 
 from utils import chgcar
 from utils.chgcar import *
@@ -25,7 +26,9 @@ def compress_dir(files: list[str], compress_file_func, compressor_name: str, wri
 
         for future in as_completed(compress_file_futures):
             if write:
-                file_no_ext, charge, mag, compress_duration = future.result()
+                file_no_ext, charge, mag, compress_duration, orig_fs, charge_fs, mag_fs = future.result()
+                metrics[file_no_ext]["orig_file_size"] = orig_fs
+                metrics[file_no_ext]["compressed_data_size"] = charge_fs + mag_fs
             else:
                 file_no_ext, structure, charge, mag, _, dims, charge_compressed, mag_compressed, compress_duration = future.result()
                 if charge_compressed and mag_compressed:
@@ -125,3 +128,10 @@ def check_dir(directory: str):
 
 def check_files(files: list[str]):
     return all(os.path.exists(f) for f in files)
+
+def delete_files(files: list[str]):
+    for f in files:
+        pathlib.Path(f).unlink()
+
+def get_file_size_mb(file: str):
+    return os.path.getsize(file) / (1024 * 1024)

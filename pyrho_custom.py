@@ -19,18 +19,6 @@ sys.argv[3] = dims_divisor
 sys.argv[4] = smear_std
 """
 
-def parse_chgcar(chgcar_fn: str):
-    vasp_cden = Chgcar.from_file(chgcar_fn)
-    cden = ChargeDensity.from_file(chgcar_fn)
-
-    structure: Structure = cden.structure
-    charge = cden.pgrids["total"]
-    mag = cden.pgrids["diff"]
-    data_aug = vasp_cden.as_dict()["data_aug"]
-    dims = cden.grid_shape
-
-    return structure, charge, mag, data_aug, dims
-
 # TODO: Time using timeit.timeit not resource.getrusage
 def compress_func(charge: PGrid, mag: PGrid, dims: list[int]):
 
@@ -54,7 +42,12 @@ def store_compressed(chgcar_fn: str, charge, mag, structure, data_aug, dims):
     with gzip.GzipFile(f"{chgcar_fn}_pyrho_compressed_mag.npy.gz", "w") as fm:
         np.save(fm, mag)
 
+    charge_fs = io2.get_file_size_mb(f"{chgcar_fn}_pyrho_compressed_charge.npy.gz")
+    mag_fs = io2.get_file_size_mb(f"{chgcar_fn}_pyrho_compressed_mag.npy.gz")
+
     chgcar.store_structure_aug_dims_pymatgen(chgcar_fn, structure, data_aug, dims)
+
+    return charge_fs, mag_fs
 
 def retrieve_compressed(file: str):
     chgcar_fn = io2.get_only_file_name(file)
@@ -98,16 +91,19 @@ def remake_chgcar(chgcar_fn: str, charge_pgrid: PGrid, mag_pgrid: PGrid, structu
     chgcar.write_file(f"{chgcar_fn}_pyrho.vasp")
 
 def compress_data(file: str, file_no_ext: str):
-    structure, charge, mag, data_aug, dims = parse_chgcar(file)
+    structure, charge, mag, data_aug, dims, _ = chgcar.parse_chgcar_pymatgen(file)
     charge_compressed, mag_compressed, compress_duration = compress_func(charge, mag, dims)
 
     return file_no_ext, structure, charge, mag, data_aug, dims, charge_compressed, mag_compressed, compress_duration
 
 def compress_file_helper(file: str, file_no_ext: str):
-    _, structure, charge, mag, data_aug, dims, charge_compressed, mag_compressed, compress_duration = compress_data(file, file_no_ext)
-    store_compressed(file_no_ext, charge_compressed, mag_compressed, structure, data_aug, dims)
+    structure, charge, mag, data_aug, dims, fs = chgcar.parse_chgcar_pymatgen(file)
 
-    return file_no_ext, charge, mag, compress_duration
+    charge_compressed, mag_compressed, compress_duration = compress_func(charge, mag, dims)
+
+    compressed_charge_fs, compressed_mag_fs = store_compressed(file_no_ext, charge_compressed, mag_compressed, structure, data_aug, dims)
+
+    return file_no_ext, charge, mag, compress_duration, fs, compressed_charge_fs, compressed_mag_fs
 
 def decompress_data(file_no_ext, charge, mag, lattice, dims):
     decompress_charge, decompress_charge_duration = decompress_func(charge, lattice, dims)
@@ -138,6 +134,8 @@ def main():
         orig_values, all_metrics = io2.compress_dir(files, compress_file_helper, "pyrho")
         for file_no_ext, file_metrics in all_metrics.items():
             print(file_no_ext, "Compression Duration: ", file_metrics["compress_duration"], "s")
+            print(file_no_ext, "Charge Original File Size: ", file_metrics["orig_file_size"], "MB")
+            print(file_no_ext, "Charge Compressed Data Size: ", file_metrics["compressed_data_size"], "MB")
 
     if method == "decompress":
         decompressed_values, all_metrics = io2.decompress_dir(files, decompress_file_helper, "pyrho")

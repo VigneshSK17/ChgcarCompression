@@ -27,6 +27,8 @@ def main():
         orig_values, all_metrics = io2.compress_dir(files, compress_file_helper, "tthresh", write=True)
         for file_no_ext, file_metrics in all_metrics.items():
             print(file_no_ext, "Compression Duration: ", file_metrics["compress_duration"], "s")
+            print(file_no_ext, "Charge Original File Size: ", file_metrics["orig_file_size"], "MB")
+            print(file_no_ext, "Charge Compressed Data Size: ", file_metrics["compressed_data_size"], "MB")
 
     if method == "decompress":
         # decompressed_values = io.decompress_dir(files, decompress_func)
@@ -81,7 +83,7 @@ def main():
         print(json.dumps(all_metrics, sort_keys=True, indent=4))
 
 def compress_data(file: str, file_no_ext: str):
-    structure, charge_pgrid, mag_pgrid, data_aug, dims = chgcar.parse_chgcar_pymatgen(file)
+    structure, charge_pgrid, mag_pgrid, data_aug, dims, _ = chgcar.parse_chgcar_pymatgen(file)
 
     charge = charge_pgrid.grid_data
     mag = mag_pgrid.grid_data
@@ -95,7 +97,7 @@ def compress_data(file: str, file_no_ext: str):
     return file_no_ext, structure, charge, mag, data_aug, dims, None, None, charge_compress_duration + mag_compress_duration
 
 def compress_file_helper(file: str, file_no_ext: str):
-    structure, charge_pgrid, mag_pgrid, data_aug, dims = chgcar.parse_chgcar_pymatgen(file)
+    structure, charge_pgrid, mag_pgrid, data_aug, dims, fs = chgcar.parse_chgcar_pymatgen(file)
 
     charge = charge_pgrid.grid_data
     mag = mag_pgrid.grid_data
@@ -106,9 +108,14 @@ def compress_file_helper(file: str, file_no_ext: str):
     charge_compress_duration = compress_func(file_no_ext, "charge", dims)
     mag_compress_duration = compress_func(file_no_ext, "mag", dims)
 
+    io2.delete_files([f"{file_no_ext}_tthresh_charge.raw", f"{file_no_ext}_tthresh_mag.raw"])
+
+    charge_fs = io2.get_file_size_mb(f"{file_no_ext}_tthresh_charge_compressed.raw")
+    mag_fs = io2.get_file_size_mb(f"{file_no_ext}_tthresh_mag_compressed.raw")
+
     chgcar.store_structure_aug_dims_pymatgen(file_no_ext, structure, data_aug, dims)
 
-    return file_no_ext, charge_pgrid, mag_pgrid, charge_compress_duration + mag_compress_duration
+    return file_no_ext, charge_pgrid, mag_pgrid, charge_compress_duration + mag_compress_duration, fs, charge_fs, mag_fs
 
 def compress_func(chgcar_fn: str, section: str, dims: list[int]):
     time_start = perf_counter()

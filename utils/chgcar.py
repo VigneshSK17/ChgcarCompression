@@ -7,6 +7,8 @@ from pyrho.charge_density import ChargeDensity, PGrid
 
 import math
 
+from utils import io2
+
 
 # CHGCAR Stuff
 def parse_chgcar(chgcar_fn, no_data_fn):
@@ -156,7 +158,9 @@ def parse_chgcar_pymatgen(chgcar_fn: str):
     data_aug = vasp_cden.as_dict()["data_aug"]
     dims = cden.grid_shape
 
-    return structure, charge, mag, data_aug, dims
+    fs = io2.get_file_size_mb(chgcar_fn)
+
+    return structure, charge, mag, data_aug, dims, fs
 
 
 def store_structure_aug_dims_pymatgen(file_no_ext: str, structure: Structure, data_aug, dims: list[int]):
