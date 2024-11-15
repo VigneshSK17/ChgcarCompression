@@ -11,9 +11,10 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
+            "python": "python3.12",
             "args": [
                 "test/tthresh",
-                "remake_no_file",
+                "remake",
                 "-e",
                 "0.01"
             ]

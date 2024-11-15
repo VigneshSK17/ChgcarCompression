@@ -29,6 +29,7 @@ def compress_dir(files: list[str], compress_file_func, compressor_name: str, wri
                 file_no_ext, charge, mag, compress_duration, orig_fs, charge_fs, mag_fs = future.result()
                 metrics[file_no_ext]["orig_file_size"] = orig_fs
                 metrics[file_no_ext]["compressed_data_size"] = charge_fs + mag_fs
+                orig_values[file_no_ext] = [charge, mag]
             else:
                 file_no_ext, structure, charge, mag, _, dims, charge_compressed, mag_compressed, compress_duration = future.result()
                 if charge_compressed and mag_compressed:
@@ -36,14 +37,15 @@ def compress_dir(files: list[str], compress_file_func, compressor_name: str, wri
                     orig_values[file_no_ext] = [charge, mag]
                 else:
                     orig_values[file_no_ext] = [charge, mag, dims]
+                print(orig_values)
 
             metrics[file_no_ext]["compress_duration"] = compress_duration
             # TODO: Add file size metrics, mandate compression duration for both charge and mag
 
-        if write:
-            return orig_values, metrics
-        else:
-            return orig_values, compressed_values, metrics
+    if write:
+        return orig_values, metrics
+    else:
+        return orig_values, compressed_values, metrics
 
 def decompress_dir(files: list[str], decompress_file_func, compressor_name: str):
     decompressed_values = {}
