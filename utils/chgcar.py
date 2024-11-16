@@ -1,3 +1,4 @@
+from collections import defaultdict
 import json
 import numpy as np
 from pymatgen.core.structure import Structure
@@ -185,6 +186,23 @@ def remake_chgcar_pymatgen(charge_pgrid: PGrid, mag_pgrid: PGrid, structure: Str
     chgcar = cgden.to_Chgcar()
     chgcar.data_aug = data_aug
     return chgcar
+
+def generate_metrics(orig_data, decompressed_data, compress_metrics, decompress_metrics):
+    all_metrics = defaultdict(dict)
+    for file_no_ext in compress_metrics.keys():
+        for k, v in compress_metrics[file_no_ext].items():
+            all_metrics[file_no_ext][k] = v
+        for k, v in decompress_metrics[file_no_ext].items():
+            all_metrics[file_no_ext][k] = v
+
+    for file_no_ext in orig_data.keys():
+        orig, decompressed = orig_data[file_no_ext], decompressed_data[file_no_ext]
+        all_metrics[file_no_ext]["charge_mae"] = mae(orig[0].grid_data, decompressed[0].grid_data)
+        all_metrics[file_no_ext]["mag_mae"] = mae(orig[1].grid_data, decompressed[1].grid_data)
+        all_metrics[file_no_ext]["charge_avg_percentage_diff"] = mean_percentage_diff(orig[0].grid_data, decompressed[0].grid_data)
+        all_metrics[file_no_ext]["mag_avg_percentage_diff"] = mean_percentage_diff(orig[1].grid_data, decompressed[1].grid_data)
+
+    return all_metrics
 
 # Math
 def mae(actual: np.ndarray, predicted: np.ndarray):

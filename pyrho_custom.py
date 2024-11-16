@@ -149,20 +149,7 @@ def main():
         print("Starting decompression...")
         decompressed_values, decompress_metrics = io2.decompress_dir(files, decompress_file_helper, "pyrho")
 
-        all_metrics = defaultdict(dict)
-        for file_no_ext in compress_metrics.keys():
-            for k, v in compress_metrics[file_no_ext].items():
-                all_metrics[file_no_ext][k] = v
-            for k, v in decompress_metrics[file_no_ext].items():
-                all_metrics[file_no_ext][k] = v
-
-        for file_no_ext in orig_values.keys():
-            orig, decompressed = orig_values[file_no_ext], decompressed_values[file_no_ext]
-            all_metrics[file_no_ext]["charge_mae"] = chgcar.mae(orig[0].grid_data, decompressed[0].grid_data)
-            all_metrics[file_no_ext]["mag_mae"] = chgcar.mae(orig[1].grid_data, decompressed[1].grid_data)
-            all_metrics[file_no_ext]["charge_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[0].grid_data, decompressed[0].grid_data)
-            all_metrics[file_no_ext]["mag_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[1].grid_data, decompressed[1].grid_data)
-
+        all_metrics = chgcar.generate_metrics(orig_values, decompressed_values, compress_metrics, decompress_metrics)
         print(json.dumps(all_metrics, sort_keys=True, indent=4))
 
     if method == "remake_no_file":
@@ -171,22 +158,8 @@ def main():
         print("Starting decompression...")
         decompressed_values, decompress_metrics = io2.decompress_dir_no_file(compressed_values, decompress_data)
 
-        all_metrics = defaultdict(dict)
-        for file_no_ext in compress_metrics.keys():
-            for k, v in compress_metrics[file_no_ext].items():
-                all_metrics[file_no_ext][k] = v
-            for k, v in decompress_metrics[file_no_ext].items():
-                all_metrics[file_no_ext][k] = v
-
-        for file_no_ext in orig_values.keys():
-            orig, decompressed = orig_values[file_no_ext], decompressed_values[file_no_ext]
-            all_metrics[file_no_ext]["charge_mae"] = chgcar.mae(orig[0].grid_data, decompressed[0].grid_data)
-            all_metrics[file_no_ext]["mag_mae"] = chgcar.mae(orig[1].grid_data, decompressed[1].grid_data)
-            all_metrics[file_no_ext]["charge_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[0].grid_data, decompressed[0].grid_data)
-            all_metrics[file_no_ext]["mag_avg_percentage_diff"] = chgcar.mean_percentage_diff(orig[1].grid_data, decompressed[1].grid_data)
-
+        all_metrics = chgcar.generate_metrics(orig_values, decompressed_values, compress_metrics, decompress_metrics)
         print(json.dumps(all_metrics, sort_keys=True, indent=4))
-
 
 
 if __name__ == "__main__":

@@ -37,7 +37,6 @@ def compress_dir(files: list[str], compress_file_func, compressor_name: str, wri
                     orig_values[file_no_ext] = [charge, mag]
                 else:
                     orig_values[file_no_ext] = [charge, mag, dims]
-                print(orig_values)
 
             metrics[file_no_ext]["compress_duration"] = compress_duration
             # TODO: Add file size metrics, mandate compression duration for both charge and mag
