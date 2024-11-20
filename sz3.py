@@ -1,4 +1,5 @@
 import gzip
+import json
 import sys
 from time import perf_counter
 import numpy as np
@@ -8,7 +9,9 @@ from lib.sz3.tools.pysz import pysz
 from utils import chgcar, io2
 
 """
-sys.argv[1] = relative target accuracy
+sys.argv[1] = chgcar_folder
+sys.argv[2] = compress/decompress/remake/remake_no_file
+sys.argv[3] = relative target accuracy
 """
 
 SZPATH = "lib/sz3/build/tools/sz3c/libSZ3c.dylib"
@@ -19,8 +22,8 @@ SZ3 = pysz.SZ(SZPATH)
 def compress_func(charge: np.ndarray, mag: np.ndarray):
     time_start = perf_counter()
 
-    charge_compressed_data, _ = SZ3.compress(charge, 1, None, sys.argv[1], None)
-    mag_compressed_data, _ = SZ3.compress(mag, 1, None, sys.argv[1], None)
+    charge_compressed_data, _ = SZ3.compress(charge, 1, 1e-9, int(sys.argv[3]), 1e-9)
+    mag_compressed_data, _ = SZ3.compress(mag, 1, 1e-9, int(sys.argv[3]), 1e-9)
 
     time_end = perf_counter()
 
@@ -87,3 +90,65 @@ def compress_file_helper(file: str, file_no_ext: str):
     charge_fs, mag_fs = store_compressed(file_no_ext, charge_compressed, mag_compressed, structure, data_aug, dims)
 
     return file_no_ext, charge_pgrid, mag_pgrid, compress_duration, fs, charge_fs, mag_fs
+
+
+def decompress_data(file_no_ext, charge, mag, lattice, dims):
+    decompress_charge, decompress_mag, decompress_duration = decompress_func(charge, mag, dims)
+
+    decompressed_charge_pgrid, decompressed_mag_pgrid = PGrid(decompress_charge, lattice), PGrid(decompress_mag, lattice)
+
+    return file_no_ext, decompressed_charge_pgrid, decompressed_mag_pgrid, decompress_duration
+
+
+def decompress_file_helper(file: str):
+    retrieved = retrieve_compressed(file)
+    if retrieved is None:
+        return None
+    chgcar_fn, charge_compressed, mag_compressed, dims, structure, lattice, data_aug = retrieve_compressed(file)
+
+    decompress_charge, decompress_mag, decompress_duration = decompress_func(charge_compressed, mag_compressed, dims)
+
+    decompress_charge_pgrid, decompress_mag_pgrid = PGrid(decompress_charge, lattice), PGrid(decompress_mag, lattice)
+
+    return chgcar_fn, structure, data_aug, decompress_charge_pgrid, decompress_mag_pgrid, decompress_duration
+
+
+def main():
+    folder = sys.argv[1]
+    method = sys.argv[2]
+
+    if not io2.check_dir(folder):
+        print("Invalid directory")
+        sys.exit(1)
+    files = io2.get_files_in_dir(folder)
+
+    if method == "compress":
+        orig_values, all_metrics = io2.compress_dir(files, compress_file_helper, "sz3")
+        print(json.dumps(all_metrics, sort_keys=True, indent=4))
+
+    elif method == "decompress":
+        decompressed_values, all_metrics = io2.decompress_dir(files, decompress_file_helper, "sz3")
+        print(json.dumps(all_metrics, sort_keys=True, indent=4))
+
+    elif method == "remake":
+        print("Starting compression...")
+        orig_values, compress_metrics = io2.compress_dir(files, compress_file_helper, "sz3")
+        print("Starting decompression...")
+        decompressed_values, decompress_metrics = io2.decompress_dir(files, decompress_file_helper, "sz3")
+
+        # TODO: Check the dict keys here
+        all_metrics = chgcar.generate_metrics(orig_values, decompressed_values, compress_metrics, decompress_metrics)
+        print(json.dumps(all_metrics, sort_keys=True, indent=4))
+
+    elif method == "remake_no_file":
+        print("Starting compression...")
+        orig_values, compressed_values, compress_metrics = io2.compress_dir(files, compress_data, "sz3", write=False)
+        print("Starting decompression...")
+        decompressed_values, decompress_metrics = io2.decompress_dir_no_file(compressed_values, decompress_data)
+
+        all_metrics = chgcar.generate_metrics(orig_values, decompressed_values, compress_metrics, decompress_metrics)
+        print(json.dumps(all_metrics, sort_keys=True, indent=4))
+
+
+if __name__ == "__main__":
+    main()

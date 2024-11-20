@@ -210,4 +210,17 @@ def mae(actual: np.ndarray, predicted: np.ndarray):
 
 def mean_percentage_diff(actual: np.ndarray, predicted: np.ndarray):
     actual, predicted = actual.astype("float"), predicted.astype("float")
-    return (abs((np.abs(actual - predicted) / ((actual + predicted) / 2)) * 100)).mean()
+    return np.sum(np.abs(actual - predicted))/np.sum(np.abs(actual))*100
+
+
+
+
+
+
+
+
+
+
+
+
+
