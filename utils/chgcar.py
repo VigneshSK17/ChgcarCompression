@@ -1,6 +1,7 @@
 from collections import defaultdict
 import json
 import numpy as np
+import pandas as pd
 from pymatgen.core.structure import Structure
 from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.outputs import Chgcar
@@ -211,6 +212,15 @@ def mae(actual: np.ndarray, predicted: np.ndarray):
 def mean_percentage_diff(actual: np.ndarray, predicted: np.ndarray):
     actual, predicted = actual.astype("float"), predicted.astype("float")
     return np.sum(np.abs(actual - predicted))/np.sum(np.abs(actual))*100
+
+# Random
+def gen_df(values, name="orig"):
+    values_dict = {}
+    for key in values:
+        values_dict[f'{key}_charge_{name}'] = values[key][0].grid_data.flatten()
+        values_dict[f'{key}_mag_{name}'] = values[key][1].grid_data.flatten()
+
+    return pd.DataFrame(dict([(key, pd.Series(value)) for key, value in values_dict.items()]))
 
 
 

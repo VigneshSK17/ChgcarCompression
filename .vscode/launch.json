@@ -12,18 +12,18 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "python": "python3.12",
-            "args": [
-                "test/tthresh",
-                "remake",
-                "-e",
-                "0.01"
-            ]
             // "args": [
-            //     "test/pyrho",
+            //     "test/tthresh",
             //     "remake",
-            //     "2",
+            //     "-e",
             //     "0.01"
             // ]
+            "args": [
+                "test/pyrho",
+                "remake",
+                "2",
+                "0.01"
+            ]
         }
     ]
 }

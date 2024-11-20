@@ -5,6 +5,7 @@ import json
 import sys
 from time import perf_counter
 import numpy as np
+import pandas as pd
 from pymatgen.core.structure import Structure
 from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.outputs import Chgcar

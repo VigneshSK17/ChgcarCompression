@@ -1,5 +1,6 @@
 lib/
 test/
+*.csv
 
 ## C++
 # Prerequisites
