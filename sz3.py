@@ -75,9 +75,9 @@ def decompress_func(charge: np.ndarray, mag: np.ndarray, dims: list[int]):
 def compress_data(file: str, file_no_ext: str):
     structure, charge_pgrid, mag_pgrid, data_aug, dims, fs = chgcar.parse_chgcar_pymatgen(file)
 
-    charge_compressed, mag_compressed, compress_duration = compress_func(charge_pgrid, mag_pgrid)
+    charge_compressed, mag_compressed, compress_duration = compress_func(charge_pgrid.grid_data, mag_pgrid.grid_data)
 
-    return file_no_ext, charge_pgrid, mag_pgrid, data_aug, dims, charge_compressed, mag_compressed, compress_duration
+    return file_no_ext, structure, charge_pgrid, mag_pgrid, data_aug, dims, charge_compressed, mag_compressed, compress_duration
 
 
 def compress_file_helper(file: str, file_no_ext: str):
