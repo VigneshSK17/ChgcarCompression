@@ -29,7 +29,7 @@ def compress_dir(files: list[str], compress_file_func, compressor_name: str, wri
                 file_no_ext, charge, mag, compress_duration, orig_fs, charge_fs, mag_fs = future.result()
                 metrics[file_no_ext]["orig_file_size"] = orig_fs
                 metrics[file_no_ext]["compressed_data_size"] = charge_fs + mag_fs
-                metrics[file_no_ext]["compression_ratio"] = orig_fs / (charge_fs + mag_fs)
+                # TODO: Add proper compression ratio metric with all files included
                 orig_values[file_no_ext] = [charge, mag]
             else:
                 file_no_ext, structure, charge, mag, _, dims, charge_compressed, mag_compressed, compress_duration = future.result()
