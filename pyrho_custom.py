@@ -151,7 +151,7 @@ def main():
         decompressed_values, decompress_metrics = io2.decompress_dir(files, decompress_file_helper, "pyrho")
 
         all_metrics = chgcar.generate_metrics(orig_values, decompressed_values, compress_metrics, decompress_metrics)
-        print(json.dumps(all_metrics, sort_keys=True, indent=4))
+        chgcar.write_metrics_to_file("metrics.json", all_metrics, f"pyrho_{sys.argv[3]}_{sys.argv[4]}")
 
     if method == "remake_no_file":
         print("Starting compression...")

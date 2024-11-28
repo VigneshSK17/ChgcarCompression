@@ -22,8 +22,8 @@ SZ3 = pysz.SZ(SZPATH)
 def compress_func(charge: np.ndarray, mag: np.ndarray):
     time_start = perf_counter()
 
-    charge_compressed_data, _ = SZ3.compress(charge, 1, 1e-9, int(sys.argv[3]), 1e-9)
-    mag_compressed_data, _ = SZ3.compress(mag, 1, 1e-9, int(sys.argv[3]), 1e-9)
+    charge_compressed_data, _ = SZ3.compress(charge, 1, 1e-9, float(sys.argv[3]), 1e-9)
+    mag_compressed_data, _ = SZ3.compress(mag, 1, 1e-9, float(sys.argv[3]), 1e-9)
 
     time_end = perf_counter()
 
@@ -138,7 +138,8 @@ def main():
 
         # TODO: Check the dict keys here
         all_metrics = chgcar.generate_metrics(orig_values, decompressed_values, compress_metrics, decompress_metrics)
-        print(json.dumps(all_metrics, sort_keys=True, indent=4))
+        # print(json.dumps(all_metrics, sort_keys=True, indent=4))
+        chgcar.write_metrics_to_file("metrics.json", all_metrics, f"sz3_{sys.argv[3]}")
 
     elif method == "remake_no_file":
         print("Starting compression...")
