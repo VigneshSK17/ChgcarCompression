@@ -6,7 +6,7 @@ cd $PROJECT_DIR/..
 pwd
 
 # Make lib directory
-LIB_DIR="$PROJECT_DIR/lib"
+LIB_DIR="$PROJECT_DIR/../lib"
 if [ ! -d "$LIB_DIR" ]; then
 		mkdir "$LIB_DIR"
 fi
