@@ -1,4 +1,5 @@
-lib/
+lib/*
+!lib/neurcomp/
 test/
 *.tar.gz*
 *.csv
