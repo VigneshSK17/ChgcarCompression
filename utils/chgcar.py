@@ -1,8 +1,8 @@
 from collections import defaultdict
 import json
 import numpy as np
-import pandas as pd
 from pymatgen.core.structure import Structure
+
 from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp.outputs import Chgcar
 from pyrho.charge_density import ChargeDensity, PGrid
