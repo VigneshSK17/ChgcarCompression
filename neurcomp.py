@@ -57,32 +57,35 @@ def compress_func(network_fn: str, config_fn: str):
     return compressed_fn, compressed_fs, time_end - time_start
 
 
-def decompress_func(compressed_fn: str, volume_fn: str = None):
+def decompress_func(compressed_fn: str, dims: list[int]):
     decompressed_fn = compressed_fn.split("_compressed")[0] + "_decompressed"
 
+    # TODO: Figure out how to neurcomp decompress without orig volume
     cmd = ["python", NEURCOMP_DIR + "net_decompress.py",
         "--compressed", compressed_fn,
+        "--resolution", f"{dims[0]}x{dims[1]}x{dims[2]}",
         "--recon", decompressed_fn]
 
     time_start = perf_counter()
     subprocess.run(cmd)
     time_end = perf_counter()
 
-    return decompressed_fn + ".vti", time_end - time_start
+    return decompressed_fn + ".npy", time_end - time_start
 
 
 def retrieve_compressed(file: str):
-    chgcar_fn = file.split("_neurcomp_compressed")[0]
-    files_required = [f"{chgcar_fn}_neurcomp_compressed", f"{chgcar_fn}_dims.txt", f"{chgcar_fn}_structure.cif", f"{chgcar_fn}_data_aug.txt"]
+    if "_neurcomp_compressed" not in file:
+        return None
+    chgcar_fn = file.split("_")[0] + "_chgcar"
+    files_required = [f"{chgcar_fn}_charge_neurcomp_compressed", f"{chgcar_fn}_mag_neurcomp_compressed", f"{chgcar_fn}_structure.cif", f"{chgcar_fn}_data_aug.txt"]
     # TODO: Prevent repeating reading all files for a particular VASP, only do it once
-    # if not io2.check_files(files_required):
-    #     print(f"{file}: Missing files for decompression")
-    #     return None
+    if not io2.check_files(files_required):
+        print(f"{file}: Missing files for decompression")
+        return None
 
-    print(file, chgcar_fn)
     structure, lattice, data_aug, dims = chgcar.retrieve_structure_aug_dims_pymatgen(chgcar_fn)
 
-    return file, dims, structure, lattice, data_aug
+    return chgcar_fn, dims, structure, lattice, data_aug
 
 
 def vti_to_array(*fns):
@@ -122,20 +125,20 @@ def compress_file_helper(file: str, file_no_ext: str):
     total_train_duration = charge_train_duration + mag_train_duration
     total_compress_duration = charge_compress_duration + mag_compress_duration
 
-    return file_no_ext, charge_pgrid, mag_pgrid, f"charge_train_duration, {total_train_duration},{total_compress_duration}", fs, charge_fs, mag_fs
+    return file_no_ext, charge_pgrid, mag_pgrid, f"{total_train_duration},{total_compress_duration}", fs, charge_fs, mag_fs
 
 
 def decompress_file_helper(file: str):
-    # TODO: Make sure to get right _compressed file
     retrieved = retrieve_compressed(file)
     if retrieved is None:
         return None
     chgcar_fn, dims, structure, lattice, data_aug = retrieved
 
-    decompress_charge_fn, decompress_charge_duration = decompress_func(f"{chgcar_fn}_neurcomp_compressed", f"{chgcar_fn}_neurcomp_compressed_charge.vti")
-    decompress_mag_fn, decompress_mag_duration = decompress_func(f"{chgcar_fn}_neurcomp_compressed", f"{chgcar_fn}_neurcomp_compressed_mag.vti")
+    decompress_charge_fn, decompress_charge_duration = decompress_func(f"{chgcar_fn}_charge_neurcomp_compressed", dims)
+    decompress_mag_fn, decompress_mag_duration = decompress_func(f"{chgcar_fn}_mag_neurcomp_compressed", dims)
 
-    charge_array, mag_array = vti_to_array(decompress_charge_fn, decompress_mag_fn)
+    # charge_array, mag_array = vti_to_array(decompress_charge_fn, decompress_mag_fn)
+    charge_array, mag_array = np.load(decompress_charge_fn), np.load(decompress_mag_fn)
 
     charge_pgrid, mag_pgrid = PGrid(charge_array, lattice), PGrid(mag_array, lattice)
 
@@ -161,11 +164,13 @@ def main():
 
     elif method == "remake":
         print("Starting compression...")
-        orig_values, all_metrics = io2.compress_dir(files, compress_file_helper, "neurcomp")
-        print("Starting decompression...")
-        decompressed_values, all_metrics = io2.decompress_dir(files, decompress_file_helper, "neurcomp")
+        orig_values, compress_metrics = io2.compress_dir(files, compress_file_helper, "neurcomp")
 
-        all_metrics = chgcar.generate_metrics(orig_values, decompressed_values, all_metrics, all_metrics)
+        print("Starting decompression...")
+        files = io2.get_files_in_dir(folder) # Updates files
+        decompressed_values, decompress_metrics = io2.decompress_dir(files, decompress_file_helper, "neurcomp")
+
+        all_metrics = chgcar.generate_metrics(orig_values, decompressed_values, compress_metrics, decompress_metrics)
         print(json.dumps(all_metrics, sort_keys=True, indent=4))
 
 

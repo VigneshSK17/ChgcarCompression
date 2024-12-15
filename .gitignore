@@ -4,6 +4,8 @@ test/
 *.tar.gz*
 *.csv
 *.json
+*.md
+*.vti
 
 ## C++
 # Prerequisites
