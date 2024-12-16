@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 import pathlib
 
 from utils import chgcar
-from utils.chgcar import *
 
 def compress_dir(files: list[str], compress_file_func, compressor_name: str, write = True):
 
@@ -106,7 +105,7 @@ def remake_chgcar_dir(files: list[str], decompressed_values):
 
             try:
                 charge_data, mag_data = decompressed_values[file_name_prefix]
-                future_remake_chgcar = executor.submit(remake_chgcar, file_name, charge_data, mag_data, file_name_prefix + "_final.vasp")
+                future_remake_chgcar = executor.submit(chgcar.remake_chgcar, file_name, charge_data, mag_data, file_name_prefix + "_final.vasp")
 
             except:
                 print(f"Error: Could not find decompressed values for {file_name_prefix}")

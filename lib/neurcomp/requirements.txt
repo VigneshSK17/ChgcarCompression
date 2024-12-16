@@ -1,0 +1,5 @@
+pyevtk
+scipy
+torch
+torchvision
+vtk
