@@ -21,7 +21,7 @@ TODO: Add other params here
 TODO: May have to fork and make basic changes to neurcomp (add option to not send in volume for net_decompress.py)
 """
 
-NEURCOMP_DIR = "./lib/neurcomp/"
+NEURCOMP_DIR = "../lib/neurcomp/"
 
 def train_func(fn: str):
     network_fn = fn.split(".")[0] + ".pth"

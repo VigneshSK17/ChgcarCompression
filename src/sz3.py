@@ -14,7 +14,7 @@ sys.argv[2] = compress/decompress/remake/remake_no_file
 sys.argv[3] = relative target accuracy
 """
 
-SZPATH = "lib/sz3/build/tools/sz3c/libSZ3c.dylib"
+SZPATH = "../lib/sz3/build/tools/sz3c/libSZ3c.dylib"
 SZ3 = pysz.SZ(SZPATH)
 
 # sz = pysz.SZ(SZPATH)

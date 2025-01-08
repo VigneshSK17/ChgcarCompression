@@ -10,7 +10,7 @@ from pyrho.charge_density import ChargeDensity, PGrid
 
 from utils import chgcar, io, io2
 
-TTHRESH_BIN = "./lib/tthresh/build/tthresh"
+TTHRESH_BIN = "../lib/tthresh/build/tthresh"
 
 def main():
     folder = sys.argv[1]
