@@ -16,6 +16,7 @@ sys.argv[1] = chgcar_folder
 sys.argv[2] = compress/decompress/remake
 sys.argv[3] = compression_ratio
 sys.argv[4] = # of layers
+sys.argv[5] = learning rate
 TODO: Add other params here
 TODO: May have to fork and make basic changes to neurcomp (add option to not send in volume for net_decompress.py)
 """
@@ -29,7 +30,7 @@ def train_func(fn: str):
             "--volume", fn,
             "--network", network_fn,
             "--config", config_fn,
-            # "--d_out", "3",
+            "--lr", str(sys.argv[5] if sys.argv[5] else 5e-5),
             "--compression_ratio", str(sys.argv[3]),
             "--n_layers", str(sys.argv[4])]
 
@@ -57,7 +58,7 @@ def compress_func(network_fn: str, config_fn: str):
     return compressed_fn, compressed_fs, time_end - time_start
 
 
-def decompress_func(compressed_fn: str, dims: list[int]):
+def decompress_func(compressed_fn: str, dims: list[int], volume_fn: str = None):
     decompressed_fn = compressed_fn.split("_compressed")[0] + "_decompressed"
 
     # TODO: Figure out how to neurcomp decompress without orig volume
@@ -65,6 +66,12 @@ def decompress_func(compressed_fn: str, dims: list[int]):
         "--compressed", compressed_fn,
         "--resolution", f"{dims[0]}x{dims[1]}x{dims[2]}",
         "--recon", decompressed_fn]
+
+    if volume_fn:
+        cmd.pop(4)
+        cmd.pop(4)
+        cmd.append("--volume")
+        cmd.append(volume_fn)
 
     time_start = perf_counter()
     subprocess.run(cmd)
@@ -136,8 +143,9 @@ def decompress_file_helper(file: str):
 
     decompress_charge_fn, decompress_charge_duration = decompress_func(f"{chgcar_fn}_charge_neurcomp_compressed", dims)
     decompress_mag_fn, decompress_mag_duration = decompress_func(f"{chgcar_fn}_mag_neurcomp_compressed", dims)
+    # decompress_charge_fn, decompress_charge_duration = decompress_func(f"{chgcar_fn}_charge_neurcomp_compressed", dims, f"{chgcar_fn}_charge.npy")
+    # decompress_mag_fn, decompress_mag_duration = decompress_func(f"{chgcar_fn}_mag_neurcomp_compressed", dims, f"{chgcar_fn}_mag.npy")
 
-    # charge_array, mag_array = vti_to_array(decompress_charge_fn, decompress_mag_fn)
     charge_array, mag_array = np.load(decompress_charge_fn), np.load(decompress_mag_fn)
 
     charge_pgrid, mag_pgrid = PGrid(charge_array, lattice), PGrid(mag_array, lattice)
