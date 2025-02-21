@@ -206,11 +206,19 @@ def generate_metrics(orig_data, decompressed_data, compress_metrics, decompress_
     return all_metrics
 
 def write_metrics_to_file(output_file, new_metrics, entry_name):
-    with open(output_file, "r") as f:
-        try:
-            metrics_file_json = json.load(f)
-        except json.JSONDecodeError:
-            metrics_file_json = {}
+    try:
+        f = open(output_file, "r")
+    except FileNotFoundError:
+        f = open(output_file, "w")
+        f.close()
+        f = open(output_file, "r")
+
+    try:
+        metrics_file_json = json.load(f)
+    except json.JSONDecodeError:
+        metrics_file_json = {}
+    f.close()
+
     metrics_file_json[entry_name] = new_metrics
     with open(output_file, "w") as f:
         json.dump(metrics_file_json, f, sort_keys=True, indent=4)
